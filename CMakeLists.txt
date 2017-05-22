@@ -183,13 +183,34 @@ else( )
                         )
 endif()
 
+# set up CMake package installation
+set(VTKMAP_TARGETS_FILENAME "${PROJECT_NAME}Targets.cmake")
+set(VTKMAP_CONFIG_FILENAME "${PROJECT_NAME}Config.cmake")
+set(VTKMAP_CONFIGVERSION_FILENAME "${PROJECT_NAME}ConfigVersion.cmake")
+set(VTKMAP_CONFIG_DESTINATION "lib/cmake/${PROJECT_NAME}")
+
+include(CMakePackageConfigHelpers)
+configure_package_config_file("CMake/config.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/${VTKMAP_CONFIG_FILENAME}"
+    INSTALL_DESTINATION ${VTKMAP_CONFIG_DESTINATION})
+write_basic_package_version_file("${CMAKE_CURRENT_BINARY_DIR}/${VTKMAP_CONFIGVERSION_FILENAME}"
+    VERSION 0.1.0
+    COMPATIBILITY SameMajorVersion)
+
 #now generate very basic install rules
-install(TARGETS vtkMap
+install(TARGETS ${PROJECT_NAME}
+        EXPORT ${PROJECT_NAME}
         RUNTIME DESTINATION bin
         LIBRARY DESTINATION lib
         ARCHIVE DESTINATION lib
         )
 install (FILES ${HEADERS} DESTINATION include)
+install (EXPORT ${PROJECT_NAME}
+    FILE ${VTKMAP_TARGETS_FILENAME}
+    DESTINATION ${VTKMAP_CONFIG_DESTINATION})
+install (FILES "${CMAKE_CURRENT_BINARY_DIR}/${VTKMAP_CONFIG_FILENAME}"
+    "${CMAKE_CURRENT_BINARY_DIR}/${VTKMAP_CONFIGVERSION_FILENAME}"
+    DESTINATION ${VTKMAP_CONFIG_DESTINATION})
 
 # Unset flags for executables that are built downstream
 set(CMAKE_CXX_VISIBILITY_PRESET)
