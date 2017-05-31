@@ -121,6 +121,7 @@ void vtkMapTile::Build()
   this->Actor->SetMapper(Mapper);
   this->Actor->SetTexture(texture.GetPointer());
   this->Actor->PickableOff();
+  this->Actor->GetProperty()->SetLighting(false);
 
   this->BuildTime.Modified();
   imageReader->Delete();

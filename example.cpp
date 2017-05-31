@@ -2,6 +2,7 @@
 #include "vtkFeatureLayer.h"
 #include "vtkGeoMapSelection.h"
 #include "vtkInteractorStyleGeoMap.h"
+#include "vtkInteractorStyleMap3D.h"
 #include "vtkMapMarkerSet.h"
 #include "vtkMercator.h"
 #include "vtkMultiThreadedOsmLayer.h"
@@ -152,6 +153,7 @@ int main(int argc, char *argv[])
   int clusteringOff = false;
   bool showHelp = false;
   bool perspective = false;
+  bool enable3dview = false;
   bool rubberBandDisplayOnly = false;
   bool rubberBandSelection = false;
   bool rubberBandZoom = false;
@@ -184,6 +186,8 @@ int main(int argc, char *argv[])
                   &clusteringOff, "turn clustering off");
   arg.AddArgument("-p", vtksys::CommandLineArguments::NO_ARGUMENT,
                   &perspective, "use perspective projection");
+  arg.AddArgument("-3", vtksys::CommandLineArguments::NO_ARGUMENT,
+                  &enable3dview, "enable 3D view (enforces perspective projection)");
   arg.AddArgument("-q", vtksys::CommandLineArguments::NO_ARGUMENT,
                   &rubberBandZoom,
                   "set interactor to rubberband zoom mode");
@@ -201,6 +205,10 @@ int main(int argc, char *argv[])
               << arg.GetHelp()
               << std::endl;
     return -1;
+    }
+  if (enable3dview)
+    {
+    perspective = true;
     }
 
   vtkNew<vtkMap> map;
@@ -258,20 +266,32 @@ int main(int argc, char *argv[])
   vtkNew<vtkRenderWindowInteractor> intr;
   intr->SetRenderWindow(wind.GetPointer());
   vtkInteractorStyle *style = map->GetInteractorStyle();
-  vtkInteractorStyleGeoMap *mapStyle =
-    vtkInteractorStyleGeoMap::SafeDownCast(style);
+  if (! enable3dview)
+    {
+    vtkInteractorStyleGeoMap *mapStyle =
+      vtkInteractorStyleGeoMap::SafeDownCast(style);
 
-  if (rubberBandDisplayOnly)
-    {
-    mapStyle->SetRubberBandModeToDisplayOnly();
+    if (rubberBandDisplayOnly)
+      {
+      mapStyle->SetRubberBandModeToDisplayOnly();
+      }
+    else if (rubberBandSelection)
+      {
+      mapStyle->SetRubberBandModeToSelection();
+      }
+    else if (rubberBandZoom)
+      {
+      mapStyle->SetRubberBandModeToZoom();
+      }
     }
-  else if (rubberBandSelection)
+  else
     {
-    mapStyle->SetRubberBandModeToSelection();
-    }
-  else if (rubberBandZoom)
-    {
-    mapStyle->SetRubberBandModeToZoom();
+    style->Delete();
+    map->SetInteractorStyle(vtkInteractorStyleMap3D::New());
+    style = map->GetInteractorStyle();
+    vtkInteractorStyleMap3D *mapStyle =
+      vtkInteractorStyleMap3D::SafeDownCast(style);
+    mapStyle->SetMap(map.Get());
     }
   intr->SetInteractorStyle(style);
 

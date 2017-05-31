@@ -62,6 +62,9 @@ public:
   // The argument is *relative* to vtkMap::StorageDirectory.
   void SetCacheSubDirectory(const char *relativePath);
 
+  // Description: get borders of loaded tiles
+  vtkGetVector4Macro(TileBorders, double);
+
 protected:
   vtkOsmLayer();
   virtual ~vtkOsmLayer();
@@ -71,9 +74,14 @@ protected:
   virtual void AddTiles();
   void RemoveTiles();
 
-  // Next 3 methods used to add tiles to layer
+  // Next 5 methods used to add tiles to layer
   void SelectTiles(std::vector<vtkMapTile*>& tiles,
                    std::vector<vtkMapTileSpecInternal>& tileSpecs);
+  int SelectTilesPerspective_DoTile(std::vector<vtkMapTile*>& tiles,
+                                    std::vector<vtkMapTileSpecInternal>& tileSpecs,
+                                    int tilex, int tiley, int zoomLevel, vtkRenderer* renderer);
+  void SelectTilesPerspective(std::vector<vtkMapTile*>& tiles,
+                              std::vector<vtkMapTileSpecInternal>& tileSpecs);
   void InitializeTiles(std::vector<vtkMapTile*>& tiles,
                        std::vector<vtkMapTileSpecInternal>& tileSpecs);
   void RenderTiles(std::vector<vtkMapTile*>& tiles);
@@ -92,6 +100,7 @@ protected:
   char *MapTileServer;
   char *MapTileAttribution;
   vtkTextActor *AttributionActor;
+  double TileBorders[4];
 
   char *CacheDirectory;
   std::map< int, std::map< int, std::map <int, vtkMapTile*> > > CachedTilesMap;

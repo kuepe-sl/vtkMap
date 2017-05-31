@@ -345,7 +345,10 @@ void vtkMultiThreadedOsmLayer::AddTiles()
   std::vector<vtkMapTile*> tiles;
   std::vector<vtkMapTileSpecInternal> tileSpecs;
 
-  this->SelectTiles(tiles, tileSpecs);
+  if (this->Map->GetPerspectiveProjection())
+    this->SelectTilesPerspective(tiles, tileSpecs);
+  else
+    this->SelectTiles(tiles, tileSpecs);
   if (tileSpecs.size() > 0)
     {
     // Add newTileSpecs to scheduled tiles stack
@@ -389,6 +392,8 @@ DownloadImageFile(std::string url, std::string filename)
     }
 
   curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, errorBuffer);
+  // prevent random crashes due to thread-unsafe signals (see https://stackoverflow.com/a/22957000)
+  curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1);
   curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, NULL);
   curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);

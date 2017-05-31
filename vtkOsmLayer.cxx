@@ -22,6 +22,9 @@
 #include <vtkTextActor.h>
 #include <vtkTextProperty.h>
 
+#include <vtkCamera.h>
+#include <vtkPerspectiveTransform.h>
+
 #include <algorithm>
 #include <cstring>  // strdup
 #include <iomanip>
@@ -212,7 +215,10 @@ void vtkOsmLayer::AddTiles()
   std::vector<vtkMapTile*> tiles;
   std::vector<vtkMapTileSpecInternal> tileSpecs;
 
-  this->SelectTiles(tiles, tileSpecs);
+  if (this->Map->GetPerspectiveProjection())
+    this->SelectTilesPerspective(tiles, tileSpecs);
+  else
+    this->SelectTiles(tiles, tileSpecs);
   if (tileSpecs.size() > 0)
     {
     this->InitializeTiles(tiles, tileSpecs);
@@ -366,6 +372,184 @@ SelectTiles(std::vector<vtkMapTile*>& tiles,
   }
 }
 
+static void GetViewCoords(double* devCoord, const double* worldCoord, vtkRenderer* renderer)
+{
+  devCoord[0] = worldCoord[0];
+  devCoord[1] = worldCoord[1];
+  devCoord[2] = worldCoord[2];
+  renderer->WorldToView(devCoord[0], devCoord[1], devCoord[2]);
+  
+  return;
+}
+
+static bool IsPointOnScreen(const double* worldCoord, vtkRenderer* renderer)
+{
+  double devCoord[3];
+  GetViewCoords(devCoord, worldCoord, renderer);
+  
+  return (devCoord[0] >= -1.0 && devCoord[0] <= 1.0) &&
+         (devCoord[1] >= -1.0 && devCoord[1] <= 1.0);
+}
+
+// Note: assumes an X-Y plane with constant Z coordinate
+static int IsRectOnScreen(const double* worldCoord1, const double* worldCoord2, vtkRenderer* renderer)
+{
+  int ptsOnScreen;
+  double tempWCoord[3];
+  
+  tempWCoord[2] = worldCoord1[2];
+  // D--C
+  // |  |
+  // A--B
+  ptsOnScreen = 0;
+  if (IsPointOnScreen(worldCoord1, renderer)) // test A
+    ptsOnScreen ++;
+  tempWCoord[0] = worldCoord1[0];
+  tempWCoord[1] = worldCoord2[1];
+  if (IsPointOnScreen(tempWCoord, renderer))  // test B
+    ptsOnScreen ++;
+  if (IsPointOnScreen(worldCoord2, renderer)) // test C
+    ptsOnScreen ++;
+  tempWCoord[0] = worldCoord2[0];
+  tempWCoord[1] = worldCoord1[1];
+  if (IsPointOnScreen(tempWCoord, renderer))  // test D
+    ptsOnScreen ++;
+  
+  if (ptsOnScreen == 0)
+    return 0; // completely off-screen
+  else if (ptsOnScreen == 4)
+    return 1; // completely on screen
+  else
+    return -1;  // partly on screen
+}
+
+static int IsTileOnScreen(const vtkMapTileSpecInternal* tileSpec, vtkRenderer* renderer)
+{
+  double coordSt[3];
+  double coordEnd[3];
+  
+  coordSt[0] = tileSpec->Corners[0];
+  coordSt[1] = tileSpec->Corners[1];
+  coordEnd[0] = tileSpec->Corners[2];
+  coordEnd[1] = tileSpec->Corners[3];
+  coordSt[2] = coordEnd[2] = 0;
+  return IsRectOnScreen(coordSt, coordEnd, renderer);
+}
+
+int vtkOsmLayer::
+SelectTilesPerspective_DoTile(std::vector<vtkMapTile*>& tiles,
+                              std::vector<vtkMapTileSpecInternal>& tileSpecs,
+                              int tilex, int tiley, int zoomLevel, vtkRenderer* renderer)
+{
+  int zoomLevelFactor = 1 << zoomLevel; // Zoom levels are interpreted as powers of two.
+  if (tilex < 0 || tilex >= zoomLevelFactor || tiley < 0 || tiley >= zoomLevelFactor)
+    return 0;
+  
+  double degPerTile = 360.0 / zoomLevelFactor;
+  
+  int xIndex = tilex;
+  int yIndex = zoomLevelFactor - 1 - tiley;
+  
+  vtkMapTileSpecInternal tileSpec;
+  
+  tileSpec.Corners[0] = -180.0 + (xIndex + 0) * degPerTile;  // llx
+  tileSpec.Corners[1] = -180.0 + (yIndex + 0) * degPerTile;  // lly
+  tileSpec.Corners[2] = -180.0 + (xIndex + 1) * degPerTile;  // urx
+  tileSpec.Corners[3] = -180.0 + (yIndex + 1) * degPerTile;  // ury
+  
+  tileSpec.ZoomRowCol[0] = zoomLevel;
+  tileSpec.ZoomRowCol[1] = tilex;
+  tileSpec.ZoomRowCol[2] = tiley;
+  
+  tileSpec.ZoomXY[0] = zoomLevel;
+  tileSpec.ZoomXY[1] = xIndex;
+  tileSpec.ZoomXY[2] = yIndex;
+  
+  int retVal = IsTileOnScreen(&tileSpec, renderer);
+  if (retVal == 0)
+    return 0;
+  
+  vtkMapTile* tile = this->GetCachedTile(zoomLevel, xIndex, yIndex);
+  if (tile != nullptr)
+  {
+    tiles.push_back(tile);
+    tile->SetVisible(true);
+    return 1;
+  }
+  else
+  {
+    tileSpecs.push_back(tileSpec);
+    return 2;
+  }
+}
+
+void vtkOsmLayer::
+SelectTilesPerspective(std::vector<vtkMapTile*>& tiles,
+                       std::vector<vtkMapTileSpecInternal>& tileSpecs)
+{
+  static const int TILE_LIMIT = 8;  // limit in every direction (+x, -x, +y, -y)
+  auto renderCam = this->Renderer->GetActiveCamera();
+  double focalPt[3];    // x, y, z
+  
+  renderCam->GetFocalPoint(focalPt);
+  /* alternate way for getting the screen center point
+  this->Renderer->SetWorldPoint(0.0, 0.0, 0.0, 1.0);
+  this->Renderer->WorldToView();
+  this->Renderer->GetViewPoint(focalPt);
+  
+  this->Renderer->SetViewPoint(0.0, 0.0, focalPt[2]);
+  this->Renderer->ViewToWorld();
+  this->Renderer->GetWorldPoint(focalPt);*/
+  
+  int zoomLevel = this->Map->GetZoom() + 1; // +1 due to perspective projection
+  int zoomLevelFactor = 1 << zoomLevel; // Zoom levels are interpreted as powers of two.
+  
+  int tbasex = vtkMercator::long2tilex(focalPt[0], zoomLevel);
+  int tbasey = vtkMercator::lat2tiley(vtkMercator::y2lat(focalPt[1]), zoomLevel);
+  int tilex, tiley;
+  
+  // tile selection method:
+  //  - start at focal point
+  //  - from there, draw tiles in each direction
+  //  - stop drawing tiles when a tile is completely off-screen OR the maximum number of tiles is reached
+  for (int j = 0; j < TILE_LIMIT; j ++)
+  {
+    tiley = tbasey + j;
+    if (tiley < 0 || tiley >= zoomLevelFactor)
+      continue;
+    for (int i = 0; i < TILE_LIMIT; i ++)
+    {
+      tilex = tbasex + i;
+      if (SelectTilesPerspective_DoTile(tiles, tileSpecs, tilex, tiley, zoomLevel, this->Renderer) == 0)
+        break;
+    }
+    for (int i = -1; i >= -TILE_LIMIT; i --)
+    {
+      tilex = tbasex + i;
+      if (SelectTilesPerspective_DoTile(tiles, tileSpecs, tilex, tiley, zoomLevel, this->Renderer) == 0)
+        break;
+    }
+  }
+  for (int j = -1; j >= -TILE_LIMIT; j --)
+  {
+    tiley = tbasey + j;
+    if (tiley < 0 || tiley >= zoomLevelFactor)
+      continue;
+    for (int i = 0; i < TILE_LIMIT; i ++)
+    {
+      tilex = tbasex + i;
+      if (SelectTilesPerspective_DoTile(tiles, tileSpecs, tilex, tiley, zoomLevel, this->Renderer) == 0)
+        break;
+    }
+    for (int i = -1; i >= -TILE_LIMIT; i --)
+    {
+      tilex = tbasex + i;
+      if (SelectTilesPerspective_DoTile(tiles, tileSpecs, tilex, tiley, zoomLevel, this->Renderer) == 0)
+        break;
+    }
+  }
+}
+
 //----------------------------------------------------------------------------
 // Instantiates and initializes tiles from spec objects
 void vtkOsmLayer::
@@ -405,6 +589,7 @@ InitializeTiles(std::vector<vtkMapTile*>& tiles,
 // Updates display to incorporate all new tiles
 void vtkOsmLayer::RenderTiles(std::vector<vtkMapTile*>& tiles)
 {
+  this->TileBorders[0] = this->TileBorders[1] = this->TileBorders[2] = this->TileBorders[3] = 0;
   if (tiles.size() > 0)
     {
     // Remove old tiles
@@ -414,10 +599,19 @@ void vtkOsmLayer::RenderTiles(std::vector<vtkMapTile*>& tiles)
       this->Renderer->RemoveActor((*itr)->GetActor());
       }
 
+    tiles[0]->GetCorners(this->TileBorders);
     // Add new tiles
     for (std::size_t i = 0; i < tiles.size(); ++i)
       {
       this->Renderer->AddActor(tiles[i]->GetActor());
+      if (tiles[i]->GetCorners()[0] < this->TileBorders[0])
+        this->TileBorders[0] = tiles[i]->GetCorners()[0];
+      if (tiles[i]->GetCorners()[1] < this->TileBorders[1])
+        this->TileBorders[1] = tiles[i]->GetCorners()[1];
+      if (tiles[i]->GetCorners()[2] > this->TileBorders[2])
+        this->TileBorders[2] = tiles[i]->GetCorners()[2];
+      if (tiles[i]->GetCorners()[3] > this->TileBorders[3])
+        this->TileBorders[3] = tiles[i]->GetCorners()[3];
       }
 
     tiles.clear();

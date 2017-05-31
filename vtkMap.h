@@ -28,7 +28,6 @@ class vtkFeature;
 class vtkGeoMapFeatureSelector;
 class vtkGeoMapSelection;
 class vtkInteractorStyle;
-class vtkInteractorStyleGeoMap;
 class vtkLayer;
 class vtkRenderer;
 
@@ -70,8 +69,8 @@ public:
   // Description:
   // Get/Set the interactor style for the map renderer
   // Note these are asymmetric on purpose
-  vtkSetMacro(InteractorStyle, vtkInteractorStyleGeoMap*)
-  vtkInteractorStyle *GetInteractorStyle();
+  virtual void SetInteractorStyle(vtkInteractorStyle* _arg);
+  vtkGetMacro(InteractorStyle, vtkInteractorStyle*);
 
   // Description:
   // Get/Set the camera model to use perspective projection.
@@ -178,7 +177,7 @@ protected:
 
   // Description:
   // The interactor style used by the map
-  vtkInteractorStyleGeoMap* InteractorStyle;
+  vtkInteractorStyle* InteractorStyle;
 
   // Description:
   bool PerspectiveProjection;

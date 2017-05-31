@@ -87,6 +87,7 @@ set (SOURCES
     vtkGeoMapFeatureSelector.cxx
     vtkGeoMapSelection.cxx
     vtkInteractorStyleGeoMap.cxx
+    vtkInteractorStyleMap3D.cxx
     vtkMapMarkerSet.cxx
     vtkMapTile.cxx
     vtkMap.cxx
@@ -113,6 +114,7 @@ set (HEADERS
     vtkGeoMapFeatureSelector.h
     vtkGeoMapSelection.h
     vtkInteractorStyleGeoMap.h
+    vtkInteractorStyleMap3D.h
     vtkMapMarkerSet.h
     vtkMapTile.h
     vtkMapTileSpecInternal.h

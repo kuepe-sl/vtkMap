@@ -16,9 +16,11 @@
 #include "vtkGeoMapFeatureSelector.h"
 #include "vtkGeoMapSelection.h"
 #include "vtkInteractorStyleGeoMap.h"
+#include "vtkInteractorStyleMap3D.h"
 #include "vtkLayer.h"
 #include "vtkMapTile.h"
 #include "vtkMercator.h"
+#include "vtkOsmLayer.h"
 #ifndef TINY_BUILD
 #include "vtkRasterFeature.h"
 #endif
@@ -54,7 +56,10 @@ double computeCameraDistance(vtkCamera* cam, int zoomLevel)
 int computeZoomLevel(vtkCamera* cam)
 {
   double* pos = cam->GetPosition();
-  double width = pos[2] * sin(vtkMath::RadiansFromDegrees(cam->GetViewAngle()));
+  double* focal = cam->GetFocalPoint();
+  //double width = std::fabs(pos[2]);
+  double width = std::sqrt(vtkMath::Distance2BetweenPoints(pos, focal));
+  width *= sin(vtkMath::RadiansFromDegrees(cam->GetViewAngle()));
 
   for (int i = 0; i < 20; ++i)
     {
@@ -81,8 +86,9 @@ vtkMap::vtkMap()
   this->StorageDirectory = NULL;
   this->Renderer = NULL;
   this->FeatureSelector = vtkGeoMapFeatureSelector::New();
-  this->InteractorStyle = vtkInteractorStyleGeoMap::New();
-  this->InteractorStyle->SetMap(this);
+  vtkInteractorStyleGeoMap* interactorGeoMap = vtkInteractorStyleGeoMap::New();
+  this->InteractorStyle = interactorGeoMap;
+  interactorGeoMap->SetMap(this);
   this->PerspectiveProjection = false;
   this->Zoom = 1;
   this->Center[0] = this->Center[1] = 0.0;
@@ -164,9 +170,22 @@ void vtkMap::PrintSelf(ostream &os, vtkIndent indent)
 }
 
 //----------------------------------------------------------------------------
-vtkInteractorStyle *vtkMap::GetInteractorStyle()
+void vtkMap::SetInteractorStyle(vtkInteractorStyle* _arg)
 {
-  return this->InteractorStyle;
+  vtkDebugMacro(<< this->GetClassName() << " (" << this << "): setting " "InteractorStyle" " to " << _arg);
+  if (this->InteractorStyle != _arg)
+    {
+    vtkInteractorStyleGeoMap* interactorGeoMap = vtkInteractorStyleGeoMap::SafeDownCast(_arg);
+    vtkInteractorStyleMap3D* interactorMap3D = vtkInteractorStyleMap3D::SafeDownCast(_arg);
+    // We keep only our supported interactor types.
+    if (interactorGeoMap)
+      this->InteractorStyle = interactorGeoMap;
+    else if (interactorMap3D)
+      this->InteractorStyle = interactorMap3D;
+    else
+      this->InteractorStyle = NULL;
+    this->Modified();
+    }
 }
 
 //----------------------------------------------------------------------------
@@ -230,6 +249,21 @@ void vtkMap::GetVisibleBounds(double latLngCoords[4])
     return;
     }
 
+  if (this->PerspectiveProjection)
+    {
+    // for perspective projection, try to get range of displayed tiles
+    vtkOsmLayer* osmLayer = vtkOsmLayer::SafeDownCast(this->BaseLayer);
+    if (osmLayer)
+      {
+      double borderCoords[4];
+      osmLayer->GetTileBorders(borderCoords);
+      latLngCoords[0] = vtkMercator::y2lat(borderCoords[1]);
+      latLngCoords[1] = borderCoords[0];
+      latLngCoords[2] = vtkMercator::y2lat(borderCoords[3]);
+      latLngCoords[3] = borderCoords[2];
+      return;
+      }
+    }
   double displayCoords[2];
   double worldCoords[3];
   double latitude;
