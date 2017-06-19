@@ -130,6 +130,11 @@ void vtkInteractorStyleMap3D::SetMap(vtkMap *map)
 {
   this->Map = map;
   this->SetCurrentRenderer(map->GetRenderer());
+  if (! this->Map->GetPerspectiveProjection())
+  {
+    vtkWarningMacro("Using Map3D interactor style used but Map does not use perspective projection mode!"
+                    << " Drawing won't work properly.");
+  }
 }
 
 //-----------------------------------------------------------------------------
