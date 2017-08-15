@@ -287,6 +287,8 @@ SelectTiles(std::vector<vtkMapTile*>& tiles,
 
   int zoomLevel = this->Map->GetZoom();
   zoomLevel += this->Map->GetPerspectiveProjection() ? 1 : 0;
+  if (zoomLevel > 19)
+    zoomLevel = 19;
   int zoomLevelFactor = 1 << zoomLevel; // Zoom levels are interpreted as powers of two.
 
   int tile1x = vtkMercator::long2tilex(bottomLeft[0], zoomLevel);
@@ -502,6 +504,8 @@ SelectTilesPerspective(std::vector<vtkMapTile*>& tiles,
   this->Renderer->GetWorldPoint(focalPt);*/
   
   int zoomLevel = this->Map->GetZoom() + 1; // +1 due to perspective projection
+  if (zoomLevel > 19)
+    zoomLevel = 19;
   int zoomLevelFactor = 1 << zoomLevel; // Zoom levels are interpreted as powers of two.
   
   int tbasex = vtkMercator::long2tilex(focalPt[0], zoomLevel);
