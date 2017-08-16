@@ -101,6 +101,7 @@ protected:
   char *MapTileAttribution;
   vtkTextActor *AttributionActor;
   double TileBorders[4];
+  double VirtualCenter[2];  // in x and y, NOT lat/lon
 
   char *CacheDirectory;
   std::map< int, std::map< int, std::map <int, vtkMapTile*> > > CachedTilesMap;

@@ -92,6 +92,7 @@ vtkMap::vtkMap()
   this->PerspectiveProjection = false;
   this->Zoom = 1;
   this->Center[0] = this->Center[1] = 0.0;
+  this->VirtualCenter[0] = this->VirtualCenter[1] = 0.0;
   this->Initialized = false;
   this->BaseLayer = NULL;
   this->PollingCallbackCommand = NULL;
@@ -268,13 +269,14 @@ void vtkMap::GetVisibleBounds(double latLngCoords[4])
   double worldCoords[3];
   double latitude;
   double longitude;
+  double virtCtrY = vtkMercator::lat2y(this->VirtualCenter[0]);
 
   // Convert origin to world coords
   displayCoords[0] = 0.0;
   displayCoords[1] = 0.0;
   this->ComputeWorldCoords(displayCoords, 0.0, worldCoords);
-  latitude = vtkMercator::y2lat(worldCoords[1]);
-  longitude = worldCoords[0];
+  latitude = vtkMercator::y2lat(worldCoords[1] + virtCtrY);
+  longitude = worldCoords[0] + this->VirtualCenter[1];
   latLngCoords[0] = vtkMercator::validLatitude(latitude);
   latLngCoords[1] = vtkMercator::validLongitude(longitude);
 
@@ -283,8 +285,8 @@ void vtkMap::GetVisibleBounds(double latLngCoords[4])
   displayCoords[0] = sizeCoords[0];
   displayCoords[1] = sizeCoords[1];
   this->ComputeWorldCoords(displayCoords, 0.0, worldCoords);
-  latitude = vtkMercator::y2lat(worldCoords[1]);
-  longitude = worldCoords[0];
+  latitude = vtkMercator::y2lat(worldCoords[1] + virtCtrY);
+  longitude = worldCoords[0] + this->VirtualCenter[1];
   latLngCoords[2] = vtkMercator::validLatitude(latitude);
   latLngCoords[3] = vtkMercator::validLongitude(longitude);
 }
@@ -305,9 +307,9 @@ void vtkMap::GetCenter(double (&latlngPoint)[2])
     worldPoint[2] /= worldPoint[3];
     }
 
-  worldPoint[1] = vtkMercator::y2lat(worldPoint[1]);
+  worldPoint[1] = vtkMercator::y2lat(worldPoint[1] + vtkMercator::lat2y(this->VirtualCenter[0]));
   latlngPoint[0] = worldPoint[1];
-  latlngPoint[1] = worldPoint[0];
+  latlngPoint[1] = worldPoint[0] + this->VirtualCenter[1];
 }
 
 //----------------------------------------------------------------------------
@@ -325,8 +327,8 @@ void vtkMap::SetCenter(double latitude, double longitude)
   // If initialized, update camera distance
   if (this->Initialized)
     {
-    double x = longitude;
-    double y = vtkMercator::lat2y(latitude);
+    double x = longitude - this->VirtualCenter[1];
+    double y = vtkMercator::lat2y(latitude) - vtkMercator::lat2y(this->VirtualCenter[0]);
 
     double cameraCoords[3] = {0.0, 0.0, 1.0};
     this->Renderer->GetActiveCamera()->GetPosition(cameraCoords);
@@ -570,8 +572,8 @@ void vtkMap::Draw()
       }
 
     // Initialize graphics
-    double x = this->Center[1];
-    double y = vtkMercator::lat2y(this->Center[0]);
+    double x = this->Center[1] - this->VirtualCenter[1];
+    double y = vtkMercator::lat2y(this->Center[0]) - vtkMercator::lat2y(this->VirtualCenter[0]);
     double distance =
       computeCameraDistance(this->Renderer->GetActiveCamera(), this->Zoom);
     this->Renderer->GetActiveCamera()->SetPosition(x, y, distance);
@@ -691,8 +693,8 @@ void vtkMap::ComputeWorldCoords(double displayCoords[2], double z,
 void vtkMap::ComputeDisplayCoords(double latLngCoords[2], double elevation,
                                   double displayCoords[3])
 {
-  double x = latLngCoords[1];
-  double y = vtkMercator::lat2y(latLngCoords[0]);
+  double x = latLngCoords[1] - this->VirtualCenter[1];
+  double y = vtkMercator::lat2y(latLngCoords[0]) - vtkMercator::lat2y(this->VirtualCenter[0]);
   this->Renderer->SetWorldPoint(x, y, elevation, 1.0);
   this->Renderer->WorldToDisplay();
   this->Renderer->GetDisplayPoint(displayCoords);

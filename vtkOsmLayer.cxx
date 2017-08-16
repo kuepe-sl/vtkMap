@@ -238,6 +238,9 @@ SelectTiles(std::vector<vtkMapTile*>& tiles,
   double focusDisplayPoint[3], bottomLeft[4], topRight[4];
   int width, height, tile_llx, tile_lly;
 
+  this->VirtualCenter[0] = this->Map->GetVirtualCenter()[1];
+  this->VirtualCenter[1] = vtkMercator::lat2y(this->Map->GetVirtualCenter()[0]);
+
   this->Renderer->SetWorldPoint(0.0, 0.0, 0.0, 1.0);
   this->Renderer->WorldToDisplay();
   this->Renderer->GetDisplayPoint(focusDisplayPoint);
@@ -253,6 +256,8 @@ SelectTiles(std::vector<vtkMapTile*>& tiles,
     bottomLeft[1] /= bottomLeft[3];
     bottomLeft[2] /= bottomLeft[3];
     }
+  bottomLeft[0] += this->VirtualCenter[0];
+  bottomLeft[1] += this->VirtualCenter[1];
 
   //std::cerr << "Before bottomLeft " << bottomLeft[0] << " " << bottomLeft[1] << std::endl;
 
@@ -276,6 +281,8 @@ SelectTiles(std::vector<vtkMapTile*>& tiles,
     topRight[1] /= topRight[3];
     topRight[2] /= topRight[3];
     }
+  topRight[0] += this->VirtualCenter[0];
+  topRight[1] += this->VirtualCenter[1];
 
   if (this->Map->GetPerspectiveProjection())
     {
@@ -354,10 +361,10 @@ SelectTiles(std::vector<vtkMapTile*>& tiles,
         {
         vtkMapTileSpecInternal tileSpec;
 
-        tileSpec.Corners[0] = -180.0 + xIndex * lonPerTile;  // llx
-        tileSpec.Corners[1] = -180.0 + yIndex * latPerTile;  // lly
-        tileSpec.Corners[2] = -180.0 + (xIndex + 1) * lonPerTile;  // urx
-        tileSpec.Corners[3] = -180.0 + (yIndex + 1) * latPerTile;  // ury
+        tileSpec.Corners[0] = -180.0 + xIndex * lonPerTile - this->VirtualCenter[0];  // llx
+        tileSpec.Corners[1] = -180.0 + yIndex * latPerTile - this->VirtualCenter[1];  // lly
+        tileSpec.Corners[2] = -180.0 + (xIndex + 1) * lonPerTile - this->VirtualCenter[0];  // urx
+        tileSpec.Corners[3] = -180.0 + (yIndex + 1) * latPerTile - this->VirtualCenter[1];  // ury
 
         tileSpec.ZoomRowCol[0] = zoomLevel;
         tileSpec.ZoomRowCol[1] = i;
@@ -454,10 +461,10 @@ SelectTilesPerspective_DoTile(std::vector<vtkMapTile*>& tiles,
   
   vtkMapTileSpecInternal tileSpec;
   
-  tileSpec.Corners[0] = -180.0 + (xIndex + 0) * degPerTile;  // llx
-  tileSpec.Corners[1] = -180.0 + (yIndex + 0) * degPerTile;  // lly
-  tileSpec.Corners[2] = -180.0 + (xIndex + 1) * degPerTile;  // urx
-  tileSpec.Corners[3] = -180.0 + (yIndex + 1) * degPerTile;  // ury
+  tileSpec.Corners[0] = -180.0 + (xIndex + 0) * degPerTile - this->VirtualCenter[0];  // llx
+  tileSpec.Corners[1] = -180.0 + (yIndex + 0) * degPerTile - this->VirtualCenter[1];  // lly
+  tileSpec.Corners[2] = -180.0 + (xIndex + 1) * degPerTile - this->VirtualCenter[0];  // urx
+  tileSpec.Corners[3] = -180.0 + (yIndex + 1) * degPerTile - this->VirtualCenter[1];  // ury
   
   tileSpec.ZoomRowCol[0] = zoomLevel;
   tileSpec.ZoomRowCol[1] = tilex;
@@ -490,8 +497,11 @@ SelectTilesPerspective(std::vector<vtkMapTile*>& tiles,
                        std::vector<vtkMapTileSpecInternal>& tileSpecs)
 {
   static const int TILE_LIMIT = 8;  // limit in every direction (+x, -x, +y, -y)
-  auto renderCam = this->Renderer->GetActiveCamera();
+  vtkCamera* renderCam = this->Renderer->GetActiveCamera();
   double focalPt[3];    // x, y, z
+  
+  this->VirtualCenter[0] = this->Map->GetVirtualCenter()[1];
+  this->VirtualCenter[1] = vtkMercator::lat2y(this->Map->GetVirtualCenter()[0]);
   
   renderCam->GetFocalPoint(focalPt);
   /* alternate way for getting the screen center point
@@ -502,6 +512,8 @@ SelectTilesPerspective(std::vector<vtkMapTile*>& tiles,
   this->Renderer->SetViewPoint(0.0, 0.0, focalPt[2]);
   this->Renderer->ViewToWorld();
   this->Renderer->GetWorldPoint(focalPt);*/
+  focalPt[0] += this->VirtualCenter[0];
+  focalPt[1] += this->VirtualCenter[1];
   
   int zoomLevel = this->Map->GetZoom() + 1; // +1 due to perspective projection
   if (zoomLevel > 19)
@@ -619,6 +631,10 @@ void vtkOsmLayer::RenderTiles(std::vector<vtkMapTile*>& tiles)
       }
 
     tiles.clear();
+    this->TileBorders[0] += this->VirtualCenter[0];
+    this->TileBorders[1] += this->VirtualCenter[1];
+    this->TileBorders[2] += this->VirtualCenter[0];
+    this->TileBorders[3] += this->VirtualCenter[1];
     }
 }
 

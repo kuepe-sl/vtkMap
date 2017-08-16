@@ -92,6 +92,11 @@ public:
   void SetCenter(double latitude, double longitude);
 
   // Description:
+  // Get/Set virtual center of the map. (coordinates for VTK position 0,0)
+  vtkGetVector2Macro(VirtualCenter, double);
+  vtkSetVector2Macro(VirtualCenter, double);
+
+  // Description:
   // Set center & zoom level to display area of interest.
   // The 4 coordinates specify a rectangle in lon-lat units:
   // [latitude1, longitude1, latitude2, longitude2]
@@ -189,6 +194,10 @@ protected:
   // Description:
   // Center of the map
   double Center[2];
+
+  // Description:
+  // Virtual center of the map
+  double VirtualCenter[2];
 
   // Description:
   // Directory for caching map files

@@ -95,7 +95,7 @@ void vtkInteractorStyleMap3D::OnMouseWheelForward()
     // Redraw the map
     this->GetCurrentRenderer()->ResetCameraClippingRange(); // ensure that everything is visible
     this->Map->Draw();
-    return; // don't forward event to prevent VTK from doing its own camera handling
+    return; // don't forward event to prevent VTK from doing its own additional camera handling
   }
   this->Superclass::OnMouseWheelForward();
 }
@@ -120,7 +120,7 @@ void vtkInteractorStyleMap3D::OnMouseWheelBackward()
     // Redraw the map
     this->GetCurrentRenderer()->ResetCameraClippingRange(); // ensure that everything is visible
     this->Map->Draw();
-    return; // don't forward event to prevent VTK from doing its own camera handling
+    return; // don't forward event to prevent VTK from doing its own additional camera handling
   }
   this->Superclass::OnMouseWheelBackward();
 }
@@ -132,7 +132,7 @@ void vtkInteractorStyleMap3D::SetMap(vtkMap *map)
   this->SetCurrentRenderer(map->GetRenderer());
   if (! this->Map->GetPerspectiveProjection())
   {
-    vtkWarningMacro("Using Map3D interactor style used but Map does not use perspective projection mode!"
+    vtkWarningMacro("Using Map3D interactor style but Map does not use perspective projection mode!"
                     << " Drawing won't work properly.");
   }
 }
@@ -210,7 +210,7 @@ void vtkInteractorStyleMap3D::fixCameraZ(vtkCamera *camera)
   if (std::fabs(zMove) < 0.000001)
     return; // nothing to fix
 
-  // Since we're looking at a 2D map, not having the focal point makes no sense.
+  // Since we're looking at a 2D map, not having the focal point at z==0 makes no sense.
   // Thus we turn the Z-movement into an XY-movement.
 
   double focalCoords[3];
