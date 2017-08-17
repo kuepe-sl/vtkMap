@@ -238,8 +238,7 @@ SelectTiles(std::vector<vtkMapTile*>& tiles,
   double focusDisplayPoint[3], bottomLeft[4], topRight[4];
   int width, height, tile_llx, tile_lly;
 
-  this->VirtualCenter[0] = this->Map->GetVirtualCenter()[1];
-  this->VirtualCenter[1] = vtkMercator::lat2y(this->Map->GetVirtualCenter()[0]);
+  this->Map->GetVirtualCenterXY(this->VirtualCenter);
 
   this->Renderer->SetWorldPoint(0.0, 0.0, 0.0, 1.0);
   this->Renderer->WorldToDisplay();
@@ -500,8 +499,7 @@ SelectTilesPerspective(std::vector<vtkMapTile*>& tiles,
   vtkCamera* renderCam = this->Renderer->GetActiveCamera();
   double focalPt[3];    // x, y, z
   
-  this->VirtualCenter[0] = this->Map->GetVirtualCenter()[1];
-  this->VirtualCenter[1] = vtkMercator::lat2y(this->Map->GetVirtualCenter()[0]);
+  this->Map->GetVirtualCenterXY(this->VirtualCenter);
   
   renderCam->GetFocalPoint(focalPt);
   /* alternate way for getting the screen center point

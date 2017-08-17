@@ -812,11 +812,7 @@ void vtkMapMarkerSet::Update()
   // Max value is k, which sets the horizontal asymptote.
   double k = this->MaxClusterScaleFactor;
   double b = 4.0*k - 4.0;
-  double virtCenter[2] =
-  {
-    this->Layer->GetMap()->GetVirtualCenter()[1],
-    vtkMercator::lat2y(this->Layer->GetMap()->GetVirtualCenter()[0])
-  };
+  double* virtCenter = this->Layer->GetMap()->GetVirtualCenterXY();
 
   this->Internals->CurrentNodes.clear();
   std::set<ClusteringNode*> nodeSet = this->Internals->NodeTable[zoomLevel];

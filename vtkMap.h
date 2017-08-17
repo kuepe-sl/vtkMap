@@ -94,7 +94,16 @@ public:
   // Description:
   // Get/Set virtual center of the map. (coordinates for VTK position 0,0)
   vtkGetVector2Macro(VirtualCenter, double);
-  vtkSetVector2Macro(VirtualCenter, double);
+  void SetVirtualCenter(double latlngPoint[2]);
+  void SetVirtualCenter(double latitude, double longitude);
+
+  // Description:
+  // helper functions for dealing with lat/lon <-> x/y conversions
+  vtkGetVector2Macro(VirtualCenterXY, double);
+  double ConvertLat2Y(double lat);
+  double ConvertLong2X(double lon);
+  double ConvertX2Long(double x);
+  double ConvertY2Lat(double y);
 
   // Description:
   // Set center & zoom level to display area of interest.
@@ -198,6 +207,7 @@ protected:
   // Description:
   // Virtual center of the map
   double VirtualCenter[2];
+  double VirtualCenterXY[2];
 
   // Description:
   // Directory for caching map files

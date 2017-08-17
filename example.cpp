@@ -318,8 +318,8 @@ int main(int argc, char *argv[])
   feature->GetActor()->GetProperty()->SetColor(0.0, 80.0/255, 80.0/255);  // (teal)
   feature->GetActor()->GetProperty()->SetOpacity(0.5);
 
-  double x = kwLongitude;
-  double y = vtkMercator::lat2y(kwLatitude);
+  double x = map->ConvertLong2X(kwLongitude);
+  double y = map->ConvertLat2Y(kwLatitude);
   feature->GetActor()->SetPosition(x, y, 0.0);
   featureLayer->AddFeature(feature.GetPointer());
   map->Draw();
