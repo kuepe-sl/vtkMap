@@ -84,6 +84,7 @@ public:
   // Get/Set the detailing level
   vtkGetMacro(Zoom, int)
   vtkSetMacro(Zoom, int)
+  void ComputeZoomLevel();
 
   // Description:
   // Get/Set center of the map.
