@@ -92,7 +92,7 @@ protected:
 
   // Description:
   // Check if the corresponding image is downloaded
-  bool IsImageDownloaded(const char* outfile);
+  static bool IsImageDownloaded(const char* outfile);
 
   // Description:
   // Download the image corresponding to the Bing Maps QuadKey
@@ -115,6 +115,8 @@ protected:
   int Bin;
   bool VisibleFlag;
   double Corners[4];
+
+  friend class vtkMultiThreadedOsmLayer;
 
 private:
   vtkMapTile(const vtkMapTile&);  // Not implemented

@@ -156,7 +156,8 @@ void vtkMapTile::InitializeDownload()
 {
   // Check if image file already exists.
   // If not, download
-  while(!this->IsImageDownloaded(this->ImageFile.c_str()))
+  //while(!this->IsImageDownloaded(this->ImageFile.c_str()))
+  if (!this->IsImageDownloaded(this->ImageFile.c_str()))
     {
     std::cerr << "Downloading " << this->ImageSource.c_str()
               << " to " << this->ImageFile
@@ -168,18 +169,27 @@ void vtkMapTile::InitializeDownload()
 //----------------------------------------------------------------------------
 bool vtkMapTile::IsImageDownloaded(const char *outfile)
 {
+  static const char PNGHDR[4] = {'\x89', 'P', 'N', 'G'};
+  static const char JPEGHDR[2] = {'\xFF', '\xD8'};
   // Check if file can be opened
   // Additional checks to confirm existence of correct
   // texture can be added
   std::ifstream file(outfile);
-  if ( file.is_open() )
+  if ( !file.is_open() )
     {
-    file.close();
+    return false;
+    }
+  char hdr[4] = {0, 0, 0, 0};
+  file.read(hdr, 4);
+  bool readOK = file.good();
+  file.close();
+
+  if ( readOK && (!memcmp(hdr, PNGHDR, 4) || !memcmp(hdr, JPEGHDR, 2)))
+    {
     return true;
     }
   else
     {
-    file.close();
     return false;
     }
 }
@@ -208,6 +218,7 @@ void vtkMapTile::DownloadImage(const char *url, const char *outfilename)
     curl_easy_setopt(curl, CURLOPT_URL, url);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, NULL);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
+    curl_easy_setopt(curl, CURLOPT_FAILONERROR, true);  // return CURLE_HTTP_RETURNED_ERROR for HTTP error codes >= 400
     res = curl_easy_perform(curl);
     curl_easy_cleanup(curl);
     fclose(fp);

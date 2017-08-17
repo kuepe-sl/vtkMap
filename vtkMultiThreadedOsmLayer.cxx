@@ -201,7 +201,8 @@ void vtkMultiThreadedOsmLayer::BackgroundThreadExecute()
       // Process one tile per thread so that we can break out
       // sooner when new tiles are scheduled.
       while (tileSpecs.size() > 0 &&
-             this->Internals->ScheduledStackSize == workingStackSize)
+             this->Internals->ScheduledStackSize == workingStackSize &&
+             this->Internals->ThreadingEnabled)
         {
         //std::cout << "Before pass 2: " << tileSpecs.size() << std::endl;
         this->AssignOneTileSpecPerThread(tileSpecs);
@@ -273,7 +274,8 @@ void vtkMultiThreadedOsmLayer::RequestThreadExecute(int threadId)
     else
       {
       // If *not* DownloadMode, check for image file in cache
-      if (vtksys::SystemTools::FileExists(filename.c_str(), true))
+      //if (vtksys::SystemTools::FileExists(filename.c_str(), true))
+      if (vtkMapTile::IsImageDownloaded(filename.c_str()))
         {
         this->MakeUrl(spec, oss);
         url = oss.str();
@@ -397,6 +399,7 @@ DownloadImageFile(std::string url, std::string filename)
   curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, NULL);
   curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
+  curl_easy_setopt(curl, CURLOPT_FAILONERROR, true);  // return CURLE_HTTP_RETURNED_ERROR for HTTP error codes >= 400
   res = curl_easy_perform(curl);
 
   curl_easy_getinfo (curl, CURLINFO_RESPONSE_CODE, &httpStatus);
@@ -409,7 +412,7 @@ DownloadImageFile(std::string url, std::string filename)
     {
     //std::cerr << "Removing invalid file: " << filename << std::endl;
     remove(filename.c_str());
-    vtkErrorMacro(<< errorBuffer);
+    vtkErrorMacro(<< errorBuffer << " | URL: " << url);
     return false;
     }
 

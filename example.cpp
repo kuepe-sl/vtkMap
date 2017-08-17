@@ -221,6 +221,7 @@ int main(int argc, char *argv[])
   vtkNew<vtkRenderer> rend;
   map->SetRenderer(rend.GetPointer());
 
+  //map->SetVirtualCenter(37.5, -95);
   // Set viewport
   if (centerLatLon.size() == 2)
     {
