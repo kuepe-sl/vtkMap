@@ -47,14 +47,16 @@ void vtkInteractorStyleMap3D::PrintSelf(ostream& os, vtkIndent indent)
 void vtkInteractorStyleMap3D::OnLeftButtonUp()
 {
   this->Superclass::OnLeftButtonUp();
-  this->Map->Draw();
+  if (this->Map != NULL)
+    this->Map->Draw();
 }
 
 //-----------------------------------------------------------------------------
 void vtkInteractorStyleMap3D::OnRightButtonUp()
 {
   this->Superclass::OnRightButtonUp();
-  this->Map->Draw();
+  if (this->Map != NULL)
+    this->Map->Draw();
 }
 
 //--------------------------------------------------------------------------
@@ -129,11 +131,14 @@ void vtkInteractorStyleMap3D::OnMouseWheelBackward()
 void vtkInteractorStyleMap3D::SetMap(vtkMap *map)
 {
   this->Map = map;
-  this->SetCurrentRenderer(map->GetRenderer());
-  if (! this->Map->GetPerspectiveProjection())
+  if (this->Map)
   {
-    vtkWarningMacro("Using Map3D interactor style but Map does not use perspective projection mode!"
-                    << " Drawing won't work properly.");
+    this->SetCurrentRenderer(map->GetRenderer());
+    if (! this->Map->GetPerspectiveProjection())
+    {
+      vtkWarningMacro("Using Map3D interactor style but Map does not use perspective projection mode!"
+                      << " Drawing won't work properly.");
+    }
   }
 }
 
