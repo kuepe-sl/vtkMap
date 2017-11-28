@@ -52,6 +52,7 @@ vtkOsmLayer::vtkOsmLayer() : vtkFeatureLayer()
   this->MapTileAttribution = strdup("(c) OpenStreetMap contributors");
   this->AttributionActor = NULL;
   this->CacheDirectory = NULL;
+  this->BingMode = false;
 }
 
 //----------------------------------------------------------------------------
@@ -85,10 +86,23 @@ SetMapTileServer(const char *server, const char *attribution,
     return;
     }
 
+  std::string serverStr = server;
+  size_t chrPos = serverStr.find('/');
+  if (chrPos == std::string::npos)
+    chrPos = serverStr.length();
+  serverStr = serverStr.substr(0, chrPos);  // strip everything after the actual domain
+  chrPos = serverStr.find('.');
+  if (chrPos != std::string::npos && chrPos > 0)
+  {
+    char lastChr = serverStr[chrPos - 1];
+    if (lastChr >= '0' && lastChr <= '9')
+      serverStr = serverStr.substr(chrPos + 1); // strip off mirror part of the domain
+  }
+
   // Set cache directory
   // Do *not* use SystemTools::JoinPath(), because it omits the first slash
   std::string fullPath = this->Map->GetStorageDirectory() + std::string("/")
-    + server;
+    + serverStr;
 
   // Create directory if it doesn't already exist
   if(!vtksys::SystemTools::FileIsDirectory(fullPath.c_str()))
@@ -120,6 +134,7 @@ SetMapTileServer(const char *server, const char *attribution,
   this->MapTileServer = strdup(server);
   this->MapTileAttribution = strdup(attribution);
   this->CacheDirectory = strdup(fullPath.c_str());
+  this->BingMode = strstr(this->MapTileServer, "virtualearth.net") != nullptr;
 
   if (this->AttributionActor)
     {
@@ -657,15 +672,51 @@ vtkMapTile *vtkOsmLayer::GetCachedTile(int zoom, int x, int y)
 }
 
 //----------------------------------------------------------------------------
+static std::string TileSpec2BingID(const vtkMapTileSpecInternal& tileSpec)
+{
+  std::string tileStr;
+
+  // Tile Layout: every digit specifies a tile of a 2x2 area
+  // +---+---+      +----+----+----+----+
+  // |   |   |      | 00 | 01 | 10 | 11 |
+  // | 0 | 1 |      +----+----+----+----+
+  // |   |   |      | 02 | 03 | 12 | 13 |
+  // +---+---+      +----+----+----+----+
+  // |   |   |      | 20 | 21 | 30 | 31 |
+  // | 2 | 3 |      +----+----+----+----+
+  // |   |   |      | 22 | 23 | 32 | 33 |
+  // +---+---+      +----+----+----+----+
+  tileStr.reserve(tileSpec.ZoomRowCol[0]);
+  unsigned int zoomShift = tileSpec.ZoomRowCol[0] - 1;
+  for (int curLevel = 1; curLevel <= tileSpec.ZoomRowCol[0]; curLevel ++, zoomShift --)
+  {
+    int tileNum = (((tileSpec.ZoomRowCol[1] >> zoomShift) & 0x01) << 0) |
+                  (((tileSpec.ZoomRowCol[2] >> zoomShift) & 0x01) << 1);
+    tileStr.push_back('0' + tileNum);
+  }
+
+  return tileStr;
+}
+
+//----------------------------------------------------------------------------
 void vtkOsmLayer::MakeFileSystemPath(
   vtkMapTileSpecInternal& tileSpec, std::stringstream& ss)
 {
   ss.str("");
-  ss << this->GetCacheDirectory() << "/"
-     << tileSpec.ZoomRowCol[0]
-     << "-" << tileSpec.ZoomRowCol[1]
-     << "-" << tileSpec.ZoomRowCol[2]
-     << "." << this->MapTileExtension;
+  if (! this->BingMode)
+    {
+    ss << this->GetCacheDirectory() << "/"
+       << tileSpec.ZoomRowCol[0]
+       << "-" << tileSpec.ZoomRowCol[1]
+       << "-" << tileSpec.ZoomRowCol[2]
+       << "." << this->MapTileExtension;
+    }
+  else
+    {
+    ss << this->GetCacheDirectory() << "/"
+       << TileSpec2BingID(tileSpec)
+       << "." << this->MapTileExtension;
+    }
 }
 
 //----------------------------------------------------------------------------
@@ -673,9 +724,27 @@ void vtkOsmLayer::MakeUrl(
   vtkMapTileSpecInternal& tileSpec, std::stringstream& ss)
 {
   ss.str("");
-  ss << "http://" << this->MapTileServer
-     << "/" << tileSpec.ZoomRowCol[0]
-     << "/" << tileSpec.ZoomRowCol[1]
-     << "/" << tileSpec.ZoomRowCol[2]
-     << "." << this->MapTileExtension;;
+  if (! this->BingMode)
+    {
+    ss << "http://" << this->MapTileServer
+       << "/" << tileSpec.ZoomRowCol[0]
+       << "/" << tileSpec.ZoomRowCol[1]
+       << "/" << tileSpec.ZoomRowCol[2]
+       << "." << this->MapTileExtension;
+    }
+  else
+    {
+      static const char* REPLACE_STR = "##ID##";
+      std::string tileStr = TileSpec2BingID(tileSpec);
+      std::string serverStr = this->MapTileServer;
+      size_t pos1 = serverStr.find(REPLACE_STR);
+      size_t pos2 = std::string::npos;
+      if (pos1 != std::string::npos)
+        pos2 = pos1 + strlen(REPLACE_STR);
+      if (pos2 == std::string::npos || pos2 > serverStr.length())
+        pos2 = serverStr.length();
+      ss << "http://" << serverStr.substr(0, pos1)
+         << tileStr
+         << serverStr.substr(pos2);
+    }
 }

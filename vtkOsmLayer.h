@@ -99,6 +99,7 @@ protected:
   char *MapTileExtension;
   char *MapTileServer;
   char *MapTileAttribution;
+  bool BingMode;
   vtkTextActor *AttributionActor;
   double TileBorders[4];
   double VirtualCenter[2];  // in x and y, NOT lat/lon
