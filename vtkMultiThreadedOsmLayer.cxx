@@ -400,6 +400,7 @@ DownloadImageFile(std::string url, std::string filename)
   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, NULL);
   curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
   curl_easy_setopt(curl, CURLOPT_FAILONERROR, true);  // return CURLE_HTTP_RETURNED_ERROR for HTTP error codes >= 400
+  curl_easy_setopt(curl, CURLOPT_TIMEOUT, 4);
   res = curl_easy_perform(curl);
 
   curl_easy_getinfo (curl, CURLINFO_RESPONSE_CODE, &httpStatus);

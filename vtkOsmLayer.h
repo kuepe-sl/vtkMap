@@ -96,10 +96,17 @@ protected:
   void MakeUrl(vtkMapTileSpecInternal& tileSpec, std::stringstream& ss);
 
 protected:
+  enum
+  {
+	  ModeOsmHost = 0,
+	  ModeOsmFull = 1,
+	  ModeBingFull = 2
+  };
+
   char *MapTileExtension;
   char *MapTileServer;
   char *MapTileAttribution;
-  bool BingMode;
+  int MapTileSvrMode;
   vtkTextActor *AttributionActor;
   double TileBorders[4];
   double VirtualCenter[2];  // in x and y, NOT lat/lon

@@ -52,7 +52,7 @@ vtkOsmLayer::vtkOsmLayer() : vtkFeatureLayer()
   this->MapTileAttribution = strdup("(c) OpenStreetMap contributors");
   this->AttributionActor = NULL;
   this->CacheDirectory = NULL;
-  this->BingMode = false;
+  this->MapTileSvrMode = ModeOsmHost;
 }
 
 //----------------------------------------------------------------------------
@@ -76,6 +76,29 @@ void vtkOsmLayer::PrintSelf(ostream& os, vtkIndent indent)
 }
 
 //----------------------------------------------------------------------------
+static std::string GetURLHost(const char* url)
+{
+  std::string serverStr = url;
+  size_t chrPos = serverStr.find("://");
+  if (chrPos != std::string::npos)
+    serverStr = serverStr.substr(chrPos + 3); // strip protocol
+
+  chrPos = serverStr.find('/');
+  if (chrPos == std::string::npos)
+    chrPos = serverStr.length();
+  serverStr = serverStr.substr(0, chrPos);  // strip everything after the actual domain
+
+  chrPos = serverStr.find('.');
+  if (chrPos != std::string::npos && chrPos > 0)
+  {
+    char lastChr = serverStr[chrPos - 1];
+    if (lastChr >= '0' && lastChr <= '9')
+      serverStr = serverStr.substr(chrPos + 1); // strip off mirror part of the domain
+  }
+  return serverStr;
+}
+
+//----------------------------------------------------------------------------
 void vtkOsmLayer::
 SetMapTileServer(const char *server, const char *attribution,
                  const char *extension)
@@ -86,23 +109,10 @@ SetMapTileServer(const char *server, const char *attribution,
     return;
     }
 
-  std::string serverStr = server;
-  size_t chrPos = serverStr.find('/');
-  if (chrPos == std::string::npos)
-    chrPos = serverStr.length();
-  serverStr = serverStr.substr(0, chrPos);  // strip everything after the actual domain
-  chrPos = serverStr.find('.');
-  if (chrPos != std::string::npos && chrPos > 0)
-  {
-    char lastChr = serverStr[chrPos - 1];
-    if (lastChr >= '0' && lastChr <= '9')
-      serverStr = serverStr.substr(chrPos + 1); // strip off mirror part of the domain
-  }
-
   // Set cache directory
   // Do *not* use SystemTools::JoinPath(), because it omits the first slash
   std::string fullPath = this->Map->GetStorageDirectory() + std::string("/")
-    + serverStr;
+    + GetURLHost(server);
 
   // Create directory if it doesn't already exist
   if(!vtksys::SystemTools::FileIsDirectory(fullPath.c_str()))
@@ -134,7 +144,12 @@ SetMapTileServer(const char *server, const char *attribution,
   this->MapTileServer = strdup(server);
   this->MapTileAttribution = strdup(attribution);
   this->CacheDirectory = strdup(fullPath.c_str());
-  this->BingMode = strstr(this->MapTileServer, "virtualearth.net") != nullptr;
+  if (strstr(this->MapTileServer, "##OID##"))
+      this->MapTileSvrMode = ModeOsmFull;
+  else if (strstr(this->MapTileServer, "##BID##"))
+      this->MapTileSvrMode = ModeBingFull;
+  else
+      this->MapTileSvrMode = ModeOsmHost;
 
   if (this->AttributionActor)
     {
@@ -703,19 +718,22 @@ void vtkOsmLayer::MakeFileSystemPath(
   vtkMapTileSpecInternal& tileSpec, std::stringstream& ss)
 {
   ss.str("");
-  if (! this->BingMode)
+  switch (this->MapTileSvrMode)
     {
-    ss << this->GetCacheDirectory() << "/"
-       << tileSpec.ZoomRowCol[0]
-       << "-" << tileSpec.ZoomRowCol[1]
-       << "-" << tileSpec.ZoomRowCol[2]
-       << "." << this->MapTileExtension;
-    }
-  else
-    {
-    ss << this->GetCacheDirectory() << "/"
-       << TileSpec2BingID(tileSpec)
-       << "." << this->MapTileExtension;
+    case ModeOsmHost:
+    case ModeOsmFull:
+      ss << this->GetCacheDirectory() << "/"
+         << tileSpec.ZoomRowCol[0]
+         << "-" << tileSpec.ZoomRowCol[1]
+         << "-" << tileSpec.ZoomRowCol[2]
+         << "." << this->MapTileExtension;
+      break;
+
+    case ModeBingFull:
+      ss << this->GetCacheDirectory() << "/"
+         << TileSpec2BingID(tileSpec)
+         << "." << this->MapTileExtension;
+      break;
     }
 }
 
@@ -723,28 +741,45 @@ void vtkOsmLayer::MakeFileSystemPath(
 void vtkOsmLayer::MakeUrl(
   vtkMapTileSpecInternal& tileSpec, std::stringstream& ss)
 {
+  std::string searchStr;
+  std::string replaceStr;
   ss.str("");
-  if (! this->BingMode)
+  if (! strstr(this->MapTileServer, "://"))
+    ss << "http://";
+  switch (this->MapTileSvrMode)
     {
-    ss << "http://" << this->MapTileServer
-       << "/" << tileSpec.ZoomRowCol[0]
-       << "/" << tileSpec.ZoomRowCol[1]
-       << "/" << tileSpec.ZoomRowCol[2]
-       << "." << this->MapTileExtension;
+    case ModeOsmHost:
+      ss << this->MapTileServer
+         << "/" << tileSpec.ZoomRowCol[0]
+         << "/" << tileSpec.ZoomRowCol[1]
+         << "/" << tileSpec.ZoomRowCol[2]
+         << "." << this->MapTileExtension;
+      return;
+    case ModeOsmFull:
+      {
+      std::stringstream sstr;
+      sstr      << tileSpec.ZoomRowCol[0]
+         << "/" << tileSpec.ZoomRowCol[1]
+         << "/" << tileSpec.ZoomRowCol[2];
+      searchStr = "##OID##";
+      replaceStr = sstr.str();
+      }
+      break;
+
+    case ModeBingFull:
+      searchStr = "##BID##";
+      replaceStr = TileSpec2BingID(tileSpec);
+      break;
     }
-  else
-    {
-      static const char* REPLACE_STR = "##ID##";
-      std::string tileStr = TileSpec2BingID(tileSpec);
-      std::string serverStr = this->MapTileServer;
-      size_t pos1 = serverStr.find(REPLACE_STR);
-      size_t pos2 = std::string::npos;
-      if (pos1 != std::string::npos)
-        pos2 = pos1 + strlen(REPLACE_STR);
-      if (pos2 == std::string::npos || pos2 > serverStr.length())
-        pos2 = serverStr.length();
-      ss << "http://" << serverStr.substr(0, pos1)
-         << tileStr
-         << serverStr.substr(pos2);
-    }
+
+  std::string serverStr = this->MapTileServer;
+  size_t pos1 = serverStr.find(searchStr);
+  size_t pos2 = std::string::npos;
+  if (pos1 != std::string::npos)
+    pos2 = pos1 + searchStr.length();
+  if (pos2 == std::string::npos || pos2 > serverStr.length())
+    pos2 = serverStr.length();
+  ss << serverStr.substr(0, pos1)
+     << replaceStr
+     << serverStr.substr(pos2);
 }
